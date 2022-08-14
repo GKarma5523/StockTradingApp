@@ -1,5 +1,5 @@
 # StockTradingApp
-<h1>CS3750 Stock Trading APP</h1>
+<h5>CS3750 Stock Trading APP</h5>
 
 
 #D3 documentation: https://github.com/d3/d3/wiki 
