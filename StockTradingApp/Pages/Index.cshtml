@@ -1,0 +1,718 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+@***********************************************************************************************************************
+
+    TODO:
+
+        * Make random day AT LEAST 6 months old
+        -Tim
+            --Done
+
+        * Change Graph to only display dates before "random date"
+        -Tim
+            --Done
+
+        * Once a user purchases a stock, timewarp one week, get new graph data 
+        -Tim
+            --Done
+
+        * Update Total Assets as time changes
+        -Tim
+            --Done
+
+
+        * On sell, use swal, or something to let the user decide how much of that stock they want to sell
+
+        * Add check for when the balance = 0, don't let the user buy again
+
+        * On Buy
+        *   * - this is almost done, we just need to add 1 more method for the user to decide how much stock to purchase
+        *   * - draggable pie chart
+       
+
+        
+
+
+
+
+***********************************************************************************************************************@
+
+
+@Html.AntiForgeryToken() @*Added anti-forgery token for ajax call*@
+
+@*<div class="container w-100">
+*@    <div class="hidden" style="display:none" display="none" id="randomDate">@Model.StartingDate</div>
+
+    <div class=" row container mx-auto w-100 text-start mb-2">
+    <div class="col">
+        <label for="Tickers" class="form-label">Tickers:</label>
+        <input class="form-control ml-2 pl-4 w-50" autocomplete="on" list="TickerData" id="Tickers" onkeydown="return /[a-z]/i.test(event.key)" type="search" placeholder="Type to search..." />
+        <datalist id="TickerData">
+            @{
+                if (Model.SupportedTickers != null)
+                {
+                    foreach (var item in Model.SupportedTickers)
+                    {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    <option value="@item"></option>
+                    }
+                }
+            }
+        </datalist>
+        </div>    
+        <div class="col">
+            <b>CurrentDate:</b>
+        <div class="d-inline fw-bold" id="currdate">@Model.StartingDate</div>
+        </div>
+    </div>
+
+    <div class="container mt-2 text-center">
+        <div class="row">
+            <div class="col-md-3 container h-100 border-end border-bottom ">
+                <div class="row">
+                    <div class="col border-bottom pb-4 mb-2">
+
+                        <label for="inputmoney" class="form-label mt-4 ">Amnt to invest</label>
+                        <input type="number" id="inputmoney" value="" step=".01" pattern="^\d*(\.\d{0,2})?$" class="form-control w-50 mx-auto" placeholder="" />
+                        <input type="range" id="inputmoneyslider" value="0"  step="1" min="0" max="10000" class="form-range w-50 mx-auto" placeholder="" @*oninput="this.previousElementSibling.value = this.value"*@/><br />
+                        <canvas id="piechart"></canvas>
+                        <button style="display:inline-block" onclick="onButtonClickStart()" id="btnStart" class=" btn btn-info btn-sm m-2 mt-4">Start</button>
+                        <button style="display:none" onclick="onButtonClickQuit()" id="btnQuit" class="btn btn-sm btn-danger m-2 mt-4">Quit</button>
+                        <button style="display:none" onclick="onButtonClickBuy()" id="btnBuy" class="btn btn-primary btn-sm m-2 mt-4">Buy</button>
+                        <button style="display:none" onclick="onButtonClickSell()" id="btnSell" class="btn btn-sm btn-success m-2 mt-4">Sell</button>
+                        <button style="display:none" onclick="onButtonClickHold()" id="btnHold" class="btn btn-sm btn-warning m-2 mt-4">Hold</button>
+
+                        <div class="mt-4 mx-auto">
+
+                            <hr class="mt-2" />
+
+                            <span>
+                                Current Balance:
+                            </span>
+
+                            <div class="d-inline" id="dollars" value="$@Model.balance">
+                                $@Model.balance
+                            </div>
+
+                            <br />
+                            <span>
+                                Total Assets:&nbsp;&nbsp;
+                            </span>
+
+                            <div id="assets" class="w-100 d-inline">
+                                $@Model.balance
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+                <div class="container w-100 pt-2 h-100 mb-4">
+
+                    <h5>Purchase History:</h5>
+                    <hr/>
+                    <div class="container w-100 text-start" id="stocksOwned">
+                    </div>
+                    <br />
+                    <h5>Sell History:</h5>                     
+                    <hr/>                     
+                    <div class="container w-100 text-start" id="stocksSold">
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="col-md-10 w-75 h-100" id="amnt">
+            </div>
+        </div>
+    </div>
+
+
+
+    
+@*</div>
+*@
+
+
+
+@section Scripts
+    {
+    <script src='~/lib/limonte-sweetalert2/sweetalert2.all.min.js'></script>
+    <script src="~/lib/Draggable-Pie-Chart/draggable-piechart-jquery.js"></script>
+    <script src="~/lib/Draggable-Pie-Chart/draggable-piechart.js"></script>
+    <script>
+
+        //Global Variables *********************************************************************
+        Window.plotData = [];
+        var PurchasedStockIDs = [];
+        var currentStocksOwned = []
+
+
+        //Functions/Handlers *******************************************************************
+
+
+        function onButtonClickStart() {
+            var start = document.getElementById("btnStart");
+            var buy = document.getElementById("btnBuy");
+            var sell = document.getElementById("btnSell");
+            var hold = document.getElementById("btnHold");
+            var quit = document.getElementById("btnQuit");
+
+            if (start.style.display === "inline-block") {
+                // turn off star button, then turn on quit and all the other buttons //
+                start.style.display = "none";
+                quit.style.display = "inline-block";
+                start.innerHTML = "Quit";
+                buy.style.display = "inline-block";
+                sell.style.display = "inline-block";
+                hold.style.display = "inline-block";
+            }
+        }
+
+
+        function onButtonClickQuit() {
+            var assets = $('#assets').text().replace("$", '');
+            var currentAssets = parseFloat(assets);
+            var earnings = currentAssets - 10000.0;
+            var earnings = earnings.toFixed(2);
+            var msg = '';
+            if (earnings < 0) {
+                earnings = earnings * -1;
+                msg = `Earnings = -\$${earnings}`;
+            }
+            else {
+                msg = `Earnings = \$${earnings}`
+            }
+            var startingdate = $('#randomDate').text();
+            var enddate = $('#currdate').text();
+            var Dstartingdate = new Date(startingdate);
+            var Denddate = new Date(enddate);
+
+            var DateDiff =  Denddate.getTime() - Dstartingdate.getTime();
+            var diffinDays = DateDiff / (1000 * 3600 * 24)
+
+
+            msg += `<br \> Time Elapsed: ${diffinDays} days`;
+            swal.fire({
+                title: "Thanks for playing!",
+                html: msg
+            }).then(() => 
+            {
+
+                location.reload();
+
+            })
+        }
+
+
+        function onButtonClickBuy() {
+            var amnt = $('#inputmoney').val()
+            var ticker = $('#Tickers').val()
+
+            if (amnt < 0 || amnt == null || amnt == undefined || amnt == "" || amnt == " ") {
+                $('#inputmoney').addClass('border')
+                $('#inputmoney').addClass('border-danger')
+                $('#inputmoney').attr("placeholder", "How much??")
+            }
+            else if (ticker == null || ticker == undefined || ticker == "" || ticker == " ") {
+                $('#Tickers').addClass('border')
+                $('#Tickers').addClass('border-danger')
+                $('#Tickers').attr("placeholder", "Pick a stock to buy or Investigate!")
+            }
+            else {
+                if (amnt.toString().indexOf('.') > 0) {
+                    var cents = parseInt(amnt.toString().split('.')[1]);
+                    var dollars = parseInt(parseInt((amnt % 100)));
+                    var totalCents = dollars * 100 + cents;
+                }
+                else {
+                    var totalCents = amnt * 100
+                }
+
+                $('#inputmoney').removeClass('border')
+                $('#inputmoney').removeClass('border-danger')
+                $('#inputmoney').removeAttr("placeholder")
+                $('#Tickers').removeClass('border')
+                $('#Tickers').removeClass('border-danger')
+                $('#Tickers').removeAttr("placeholder")
+                var strbal = $('#dollars').text()
+                var r = /\d+/;
+                var bal = parseFloat(strbal.match(r));
+
+                if (amnt > bal) 
+                {
+                    swal.fire({
+                        title: 'You Don\'t Have That much to Invest!',
+                        icon: 'error'
+                    })
+                    return;
+                }
+                
+
+                const data = { amnt : totalCents.toString(), ticker : ticker.toString() }
+
+                $.ajax
+                    ({
+                        type: "POST",
+                        url: "./Index?handler=MinusFunds",
+                        beforeSend: (xhr) => {
+                            xhr.setRequestHeader("XSRF-TOKEN", $('input:hidden[name="__RequestVerificationToken"]').val());
+                        },
+                        contentType: "application/json; charset=utf-8",
+                        dataType: 'json',
+                        data: JSON.stringify(data),
+                        success: (response) => {
+
+                            var d = parseInt(response['amnt']);
+                            var q = parseFloat(response['quantity']).toFixed(2);
+                            var a = parseFloat(response['assets']).toFixed(2);
+                            var date = response['date'];
+                            dollars = parseInt(parseInt(d) / 100);
+                            cents = parseInt(d) % 100;
+                            var numStocks = Object.keys(PurchasedStockIDs).length
+                            var id = numStocks.toString();
+                            var stock = { id:id, date: date, ticker: ticker, amnt: amnt, quantity:q.toString() }
+                            PurchasedStockIDs.push(stock);
+                            var ownedStock = { ticker: ticker, shares: q };
+                            
+
+                            //logic to add shares to an existing stock in our map (currentStocksOwned)
+
+
+                            if (currentStocksOwned.find(obj => obj["ticker"] == ticker.toString())) {
+                                var idx = currentStocksOwned.findIndex(obj => obj["ticker"] == ticker.toString());
+                                currentStocksOwned[idx]["quantity"] = parseFloat(currentStocksOwned[idx]["quantity"]) + parseFloat(q);
+                            }
+                            else {
+                                var stockItem = {"ticker": ticker, "quantity": q}
+                                currentStocksOwned.push(stockItem);
+                            }
+
+                        $('#dollars').text(`\$${dollars}.${cents}`)
+
+                        $('#dollars').val(dollars + cents);
+                        $('#stocksOwned').append(
+                            `<div id="${id}" class="text-start">
+                                <strong>${ticker}</strong> :<br/>
+                                &emsp;Quantity: ${q}<br/>
+                                &emsp;Date: ${date}<br/>
+                            </div><hr/>`)
+                        $('#inputmoneyslider').attr('max', d/100)
+
+                        //$('#date').text(date);
+                        //$('#assets').text(`\$${a}`)
+                        $('#inputmoney').val("")
+                        $('#inputmoneyslider').val(0)
+                        //$('#Tickers').val(ticker)
+                        timeWarp();
+                        //refreshGraph();
+                    }
+                })
+            }
+        }
+
+        function onButtonClickSell() {
+            //document.getElementById("testFunction").innerHTML = "SELL BUTTON";
+        var Options = '';
+        var quantities = '';
+        for (let data of currentStocksOwned) 
+        {
+            var ticker = data['ticker'];
+            var quantity = data['quantity'];
+            Options += `<option name = ${ticker} value = ${quantity}> ${ticker}: Quantity Available: ${quantity}</option>`
+        }
+        var html = 
+        `
+        <div class="form-floating mx-auto mb-4">
+            <select class="form-select" id="swal-input-ticker" name="s1">
+                <option selected>Select a ticker</option>
+                ${Options}
+                <span> </span>
+            </select>
+            <label for="#st1"> Stock </label>
+        </div>
+
+        <div class="input-group w-50 mx-auto">
+            <span class="input-group-text">Amount To Sell </span>
+            <input id="swal-input-Amount" type="number" min="0" step="0.001" pattern="^\d*(\.\d{0,2})?$" class="form-control">
+        </div>
+
+
+        `
+
+        swal.fire
+        ({
+            title: 'Sell My Stock',
+            html : html,
+            showCancelButton: true,
+            confirmButtonText: 'Sell',
+            cancelButtonColor: '#d33',
+            confirmButtonColor: "#3085d6",
+            preConfirm: () => 
+            {
+                var ticker = $('#swal-input-ticker').find(":selected").attr("name");
+                var idx = currentStocksOwned.findIndex(obj => obj["ticker"] == ticker.toString());
+                var totalAmount = currentStocksOwned[idx]["quantity"];
+                var quantity = document.getElementById('swal-input-Amount').value;
+                if (quantity > totalAmount) {
+                    swal.close();
+                    return false;
+                }
+                if (ticker == "Select a ticker" || quantity == null) {
+                    swal.close();
+                    return false;
+                }
+                var newQuantity = parseFloat(totalAmount) - parseFloat(quantity);
+                var result = {
+                    ticker: ticker.toString(),
+                    quantity: quantity.toString(),
+                    newQuantity: newQuantity.toString()
+                };
+
+                return result;
+            }
+
+        })
+        .then((result) => {
+            var data = result['value'];
+            $.ajax
+            ({
+                type: "POST",
+                url: "./Index?handler=SellFunds",
+                beforeSend: (xhr) => {
+                    xhr.setRequestHeader("XSRF-TOKEN", $('input:hidden[name="__RequestVerificationToken"]').val());
+                },
+                contentType: "application/json; charset=utf-8",
+                dataType: 'json',
+                data: JSON.stringify(data),
+                success: (response) => 
+                {
+                    var ticker = response.ticker;
+                    var q = response.qSold;
+                    var d = response.newBalance;
+                    var bal = parseFloat(d);
+                    var date = response.date;
+                    var idx = currentStocksOwned.findIndex(obj => obj["ticker"] == ticker);
+                    currentStocksOwned[idx]["quantity"] = parseFloat(currentStocksOwned[idx]["quantity"]) - parseFloat(q);
+                    $('#dollars').text(`\$${d}`);
+                    idx = PurchasedStockIDs.findIndex(obj => obj["ticker"] == ticker);
+                    PurchasedStockIDs[idx]["quantity"] = parseFloat( PurchasedStockIDs[idx]["quantity"]) - parseFloat(q);
+                    timeWarp();
+                    $('#stocksSold').append(
+                        `<div class="text-start">
+                            <strong>${ticker}</strong> :<br/>
+                            &emsp;Quantity: ${q}<br/>
+                            &emsp;Date: ${date}<br/>
+                        </div><hr/>`)
+                    $('#inputmoneyslider').attr('max', bal)
+                    return result;
+                }
+            })
+        })
+
+
+        updateNewBalance = () => 
+        {
+            //access the dom object to update the balance..
+
+        }
+
+
+
+            //swal.fire({
+            //    title: 'Sell Stock',
+            //    html: html, //Display a list of tickers owned
+            //    showCancelButton: true,
+            //    confirmButtonText: 'Sell',
+            //    cancelButtonColor: '#d33',
+            //    confirmButtonColor: "#3085d6",
+
+            //}).then((result) => {
+
+            //    if (result.isConfirmed) {
+            //        swal.fire({
+            //            title: 'Confirm',
+            //            text: 'You are about to sell &emsp;&{ticker}',
+            //            showCancelButton: true,
+            //            confirmButtonText: 'Confirm',
+            //            cancelButtonColor: '#d33',
+            //            confirmButtonColor: "#3085d6"
+
+            //        }).then((answer) => {
+            //            if (answer.isConfirmed) {
+            //                swal.fire({
+            //                    title: 'Success',
+            //                    text: 'You sold STOCK for VALUE.'
+            //                })
+            //            }
+            //        })
+            //    }
+            //})
+        }
+
+
+        function onButtonClickHold() 
+        { 
+            timeWarp();
+        }
+
+        timeWarp = () => 
+        {
+            //Object{ data:[{stock1}, {stock2},] }
+
+            const data = []
+            //[] -> list
+            //{ } -> object
+            PurchasedStockIDs.forEach((x) => {
+                data.push({ id: x['id'], date: x['date'], ticker: x['ticker'], amnt: x['amnt'], quantity: x['quantity'] });
+            })
+
+            //{ id: PurchasedStockIDs[0]['id'], date: PurchasedStockIDs[0]['date'], ticker: PurchasedStockIDs[0]['ticker'], amnt: PurchasedStockIDs[0]['amnt'], quantity: PurchasedStockIDs[0]['quantity'] }
+            $.ajax
+            ({
+                type: "GET",
+                url: "./Index?handler=Timewarp",
+                async: true,
+                beforeSend: (xhr) => {
+                    xhr.setRequestHeader("XSRF-TOKEN", $('input:hidden[name="__RequestVerificationToken"]').val());
+                },
+                contentType: "application/json; charset=utf-8",
+                dataType: 'json',
+                data: JSON.stringify({"data":data}),
+                success: (response) => {
+                    if (response == "none") {
+                        refreshGraph();
+                        return;
+                    }
+                    else 
+                    {
+                        var a = parseFloat(response).toFixed(2);                        
+                        $('#assets').text(`\$${a}`)
+                        refreshGraph();
+                        return;
+                    }
+                    
+                }
+            })
+        }
+
+        // Graph/DataVisualization Handlers ***********************************************************************
+
+
+        refreshGraph = () => {
+            var ticker = $('#Tickers').val()
+            var date = $('#randomDate').text()
+            var data = { 'ticker': ticker, 'date': date }
+            if (ticker == "" || ticker == null || ticker == undefined || ticker == " ") {
+                return
+            }
+            else {
+                $.ajax
+                ({
+                    type: "POST",
+                    url: "./Index?handler=GetTickerData",
+                    beforeSend: (xhr) => {
+                        xhr.setRequestHeader("XSRF-TOKEN", $('input:hidden[name="__RequestVerificationToken"]').val());
+                    },
+                    contentType: "application/json; charset=utf-8",
+                    dataType: 'json',
+                    data: JSON.stringify(data),
+                    success: (message) => {
+                        Window.plotData=message
+                        displayGraph(message)
+                        return;
+                    }
+                })
+            }
+        };
+
+
+        displayGraph = (data) => {
+            var xvals = []
+            var ticker = data[0]['ticker']
+            for (var i of data) {
+                xvals.push(i.date)
+            }
+            $('#currdate').text(xvals[xvals.length-1])
+
+            var yvals = []
+            for (var i of data) {
+                yvals.push(i['open'])
+            }
+
+            var trace1 =
+            {
+                x: xvals,
+                y: yvals,
+                type: 'scatter',
+                mode: 'lines',
+            };
+
+            var data = [trace1]
+
+            var layout =
+            {
+                xaxis:
+                {
+                    type: 'date',
+                    title: 'Dates'
+                },
+                yaxis:
+                {
+                    title: 'Daily Open Price'
+                },
+
+                title: ticker
+            }
+
+            Plotly.newPlot('amnt', data, layout, { dragmode: 'select', pad: '2', autosize: true, scrollZoom: true, displayModeBar: false, clickmode: 'select' });
+            return;
+        }
+        var newPie = null;
+        DrawPiechart = (data) => {
+
+            if (newPie != null) {
+                newPie.canvas = null
+                newPie.collapsing = null
+                newPie.context = null
+                newPie.data = null
+                newPie.draggedPie = null
+                newPie.drawNode = null
+                newPie.drawSegment = null
+                newPie.hoveredIndex = null
+                newPie.minAngle = null
+                newPie.onchange = null
+                newPie.radius = null
+                newPie.destroy();
+                newPie = null;
+            }  
+
+            var canvas = document.getElementById('piechart')
+            var context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            newPie = new DraggablePiechart
+            ({
+                canvas: document.getElementById('piechart'),
+                onchange: onPieChartChange,
+                data: data,
+                minAngle: .0005
+            });
+
+
+        }
+        
+        
+
+
+        //Listeners************************************************************************
+
+        var data = 
+        [
+            { angle: 0, format: { color: "#2665da", label: 'Amount to invest' }, collapsed: false },
+            { angle: Math.PI, format: { color: "#6dd020", label: 'Balance' }, collapsed: false }
+        ];
+
+        DrawPiechart(data)
+
+        $('#Tickers').change(() => refreshGraph())
+
+
+        $(document).on('keydown', 'input[pattern]', function(e) {
+            var input = $(this);
+            var oldVal = input.val();
+            var regex = new RegExp(input.attr('pattern'), 'g');
+
+            setTimeout(function() {
+                var newVal = input.val();
+                if (!regex.test(newVal)) {
+                    input.val(oldVal);
+                }
+            }, 1);
+        });
+
+
+        
+        textChange = () => {
+        $('#inputmoneyslider').val($('#inputmoney').val())
+        $('#inputmoneyslider').trigger('change')
+            //onPieChartChange(newPie);
+        //pi = 50%
+        //2pi = 100%
+        //var amountToInvest = parseFloat($('#inputmoney').val());
+        //var strbal = $('#dollars').text()
+        //var r = /\d+/;
+        //var bal = parseFloat(strbal.match(r));
+        //var percentage = (amountToInvest / bal)*100;
+
+        //var CF = 0.062831853071796;
+        //var Newangle = percentage * CF;
+        ////$('#inputmoneyslider').val($('#inputmoney').val())
+        //newPie.moveAngle(0, Newangle);
+
+    }
+
+    function onPieChartChange(piechart) 
+    {
+
+	    // get the percentage for the first slice
+	    var amntPercentage = piechart.getSliceSizePercentage(0);
+        var strbal = $('#dollars').text()
+        var r = /\d+/;
+        var bal = parseFloat(strbal.match(r));
+        var amnt = Math.ceil((amntPercentage * bal)/100);
+        $('#inputmoney').val(amnt);
+        //$('#inputmoneyslider').trigger('change');
+        //$('#inputmoney').trigger('change');
+        $('#inputmoneyslider').val(amnt);
+
+            
+	    // get all percentages
+	    //var percentages = piechart.getAllSliceSizePercentages();
+    }
+
+
+
+
+    SliderChange = () => {
+
+        var amountToInvest = parseFloat($('#inputmoneyslider').val());
+        var strbal = $('#dollars').text()
+        var r = /\d+/;
+        var bal = parseFloat(strbal.match(r));
+
+        var percentage = (amountToInvest / bal)*100;
+        var CF = 0.062831853071796;
+        var Newangle = percentage * CF;
+        newPie.moveAngle(0,(2*Math.pi) - Newangle)
+        
+        $('#inputmoney').val($('#inputmoneyslider').val())
+
+        
+
+        var data = 
+        [
+            { angle: 0, format: { color: "#2665da", label: 'Amount to invest' }, collapsed: false },
+            { angle: Newangle, format: { color: "#6dd020", label: 'Balance' }, collapsed: false }
+        ];
+        DrawPiechart(data);
+        $('#inputmoney').val($('#inputmoneyslider').val())
+
+
+    }
+
+
+    $('#inputmoney').on('change', textChange);
+    $('#inputmoneyslider').on('change', SliderChange);
+// Logs the value while the user is moving the slider
+    $('#inputmoneyslider').on('input', SliderChange);
+
+
+
+
+
+
+
+    </script>
+}
