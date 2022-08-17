@@ -11,11 +11,11 @@
             <div class="row">
                 <div class="col-md-5 px-1" width="100%">
                     <img src="Images/StockTradingApp.png" alt="Stock Trading App" class="border img-fluid" width="100%">
-                    <p style="color:white">The main game page.</p>
+                    <p style="color:white">The main game page</p>
                 </div>
                 <div class="col-md-5 px-1">
                     <img src="Images/StockTradingApp1.png" alt="Stock Trading App" class="border img-fluid" width="100%">
-                    <p style="color:white">The stock and line graph.</p>
+                    <p style="color:white">The stock and line graph</p>
                 </div>
             </div>
         </div>
@@ -29,11 +29,11 @@
             <div class="row">
                 <div class="col-md-5 px-1" width="100%">
                     <img src="Images/StockTradingApp2.png" alt="Stock Trading App" Code class="border img-fluid" width="100%">
-                    <p style="color:white">Selling the stock you own.</p>
+                    <p style="color:white">Selling the stock you own</p>
                 </div>
                 <div class="col-md-5 px-1">
                     <img src="Images/StockTradingAppCode.png" alt="Stock Trading App Code" class="border img-fluid" width="100%">
-                    <p style="color:white">The HTML code designing the page.</p>
+                    <p style="color:white">The HTML code designing the page</p>
                 </div>
             </div>
         </div>
